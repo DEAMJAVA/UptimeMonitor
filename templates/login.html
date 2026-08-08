@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Login - Uptime Monitor{% endblock %}
+{% block content %}
+<div class="form-card">
+  <h1>Welcome back</h1>
+  <p class="subtitle">Log in to view your monitors.</p>
+  <form method="POST">
+    <div class="field">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" value="{{ email or '' }}" required autofocus>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required>
+    </div>
+    <button type="submit" class="btn btn-block">Log In</button>
+  </form>
+  <div class="form-footer-link">
+    Don't have an account? <a href="{{ url_for('auth.register') }}">Register</a>
+  </div>
+</div>
+{% endblock %}

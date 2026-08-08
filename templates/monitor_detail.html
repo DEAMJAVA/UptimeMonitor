@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}{{ monitor.label }} - Uptime Monitor{% endblock %}
+{% block head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="detail-header">
+  <div>
+    <h1>{{ monitor.label }}</h1>
+    <div class="url">{{ monitor.url }}</div>
+  </div>
+  <div class="detail-actions">
+    <span id="live-status-badge">
+      {% if monitor.current_status == 'up' %}
+        <span class="badge badge-up">Up</span>
+      {% elif monitor.current_status == 'down' %}
+        <span class="badge badge-down">Down</span>
+      {% else %}
+        <span class="badge badge-unknown">Unknown</span>
+      {% endif %}
+    </span>
+    <a href="{{ url_for('monitors.monitor_settings', monitor_id=monitor.id) }}" class="btn btn-outline btn-sm">Settings</a>
+  </div>
+</div>
+
+<div class="range-selector" id="range-selector">
+  {% for r in ranges %}
+    <button class="range-btn {% if r == '24h' %}active{% endif %}" data-range="{{ r }}">{{ range_labels[r] }}</button>
+  {% endfor %}
+</div>
+
+<div class="stats-grid" id="stats-grid">
+  <div class="stat-card">
+    <div class="label">Current Status</div>
+    <div class="value" id="stat-status">&mdash;</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Uptime %</div>
+    <div class="value green" id="stat-uptime">&mdash;</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Total Downtime</div>
+    <div class="value" id="stat-downtime">&mdash;</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Longest Downtime</div>
+    <div class="value red" id="stat-longest">&mdash;</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Total Incidents</div>
+    <div class="value" id="stat-incidents">&mdash;</div>
+  </div>
+</div>
+
+<div class="coverage-note" id="coverage-note" style="display:none"></div>
+
+<div class="panel">
+  <h2>Uptime History</h2>
+  <p class="panel-subtitle">Status per time slice for the selected period</p>
+  <div class="history-bars" id="history-bars"></div>
+  <div class="history-labels">
+    <span id="history-label-start">&mdash;</span>
+    <span id="history-label-end">Now</span>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Average Response Time</h2>
+  <div class="chart-wrap">
+    <canvas id="responseChart"></canvas>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Incidents</h2>
+  <div id="incidents-container">
+    <p class="loading-text">Loading incidents&hellip;</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.MONITOR_ID = "{{ monitor.id }}";
+  window.DATA_URL_BASE = "{{ url_for('monitors.monitor_data', monitor_id=monitor.id) }}";
+</script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

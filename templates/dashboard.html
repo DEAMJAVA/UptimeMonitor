@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Uptime Monitor{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Your Monitors</h1>
+  <a href="{{ url_for('monitors.new_monitor') }}" class="btn">+ New Monitor</a>
+</div>
+
+{% if not monitors %}
+  <div class="empty-state">
+    <p>No monitors yet.</p>
+    <a href="{{ url_for('monitors.new_monitor') }}" class="btn">Create your first monitor</a>
+  </div>
+{% else %}
+  <div class="monitor-grid">
+    {% for m in monitors %}
+      <div class="monitor-card">
+        <div class="monitor-card-top">
+          <h3><a href="{{ url_for('monitors.monitor_detail', monitor_id=m.id) }}">{{ m.label }}</a></h3>
+          {% if m.current_status == 'up' %}
+            <span class="badge badge-up">Up</span>
+          {% elif m.current_status == 'down' %}
+            <span class="badge badge-down">Down</span>
+          {% else %}
+            <span class="badge badge-unknown">Unknown</span>
+          {% endif %}
+        </div>
+        <div class="url">{{ m.url }}</div>
+        <div class="monitor-card-actions">
+          <a href="{{ url_for('monitors.monitor_detail', monitor_id=m.id) }}" class="btn btn-outline btn-sm">View</a>
+          <a href="{{ url_for('monitors.monitor_settings', monitor_id=m.id) }}" class="btn btn-outline btn-sm">Settings</a>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

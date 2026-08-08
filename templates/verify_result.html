@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Email Verification{% endblock %}
+{% block content %}
+<div class="form-card">
+  {% if success %}
+    <h1>Email verified &#10003;</h1>
+    <p class="subtitle">Your account is now active.</p>
+    <a href="{{ url_for('auth.login') }}" class="btn btn-block">Go to Login</a>
+  {% else %}
+    <h1 style="color:var(--red)">Invalid or expired link</h1>
+    <p class="subtitle">This verification link is no longer valid. It may have already been used.</p>
+    <a href="{{ url_for('auth.login') }}" class="btn btn-outline btn-block">Back to Login</a>
+  {% endif %}
+</div>
+{% endblock %}

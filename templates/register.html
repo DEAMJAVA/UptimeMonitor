@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Register - Uptime Monitor{% endblock %}
+{% block content %}
+<div class="form-card">
+  <h1>Create an account</h1>
+  <p class="subtitle">We'll send a verification link to your email.</p>
+  <form method="POST">
+    <div class="field">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" value="{{ name or '' }}" required autofocus>
+    </div>
+    <div class="field">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" value="{{ email or '' }}" required>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required minlength="8">
+      <div class="hint">At least 8 characters.</div>
+    </div>
+    <div class="field">
+      <label for="confirm">Confirm Password</label>
+      <input type="password" id="confirm" name="confirm" required minlength="8">
+    </div>
+    <button type="submit" class="btn btn-block">Register</button>
+  </form>
+  <div class="form-footer-link">
+    Already have an account? <a href="{{ url_for('auth.login') }}">Log in</a>
+  </div>
+</div>
+{% endblock %}

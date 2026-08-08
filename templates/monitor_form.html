@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ 'New Monitor' if mode == 'new' else 'Monitor Settings' }} - Uptime Monitor{% endblock %}
+{% block content %}
+<div class="form-card wide">
+  <h1>{{ 'New Monitor' if mode == 'new' else 'Monitor Settings' }}</h1>
+  <p class="subtitle">
+    {% if mode == 'new' %}
+      Set a label, the URL to watch, and who should get notified.
+    {% else %}
+      Update this monitor's settings.
+    {% endif %}
+  </p>
+  <form method="POST">
+    <div class="field">
+      <label for="label">Label</label>
+      <input type="text" id="label" name="label" placeholder="e.g. Marketing Website"
+             value="{{ monitor.label if monitor else '' }}" required autofocus>
+      <div class="hint">Shown on the dashboard and in status-change emails.</div>
+    </div>
+    <div class="field">
+      <label for="url">URL</label>
+      <input type="text" id="url" name="url" placeholder="https://example.com"
+             value="{{ monitor.url if monitor else '' }}" required>
+    </div>
+    <div class="field">
+      <label for="interval_seconds">Check Interval</label>
+      <select id="interval_seconds" name="interval_seconds">
+        {% for seconds, display in interval_choices %}
+          <option value="{{ seconds }}" {% if monitor and monitor.interval_seconds == seconds %}selected{% endif %}>{{ display }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="notify_emails">Notification Emails</label>
+      <textarea id="notify_emails" name="notify_emails" rows="2"
+                placeholder="ops@example.com, alerts@example.com">{{ monitor.notify_emails if monitor else '' }}</textarea>
+      <div class="hint">Comma-separated. These addresses get emailed whenever this monitor goes down or back up, with the label above included.</div>
+    </div>
+    <button type="submit" class="btn btn-block">{{ 'Create Monitor' if mode == 'new' else 'Save Changes' }}</button>
+  </form>
+
+  {% if mode == 'edit' %}
+    <form method="POST" action="{{ url_for('monitors.delete_monitor', monitor_id=monitor.id) }}"
+          onsubmit="return confirm('Delete this monitor and all its history? This cannot be undone.');" style="margin-top:14px">
+      <button type="submit" class="btn btn-danger btn-block">Delete Monitor</button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}
