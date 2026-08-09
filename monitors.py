@@ -77,6 +77,7 @@ def new_monitor():
             interval_seconds=interval,
             notify_emails=notify_emails,
             current_status="unknown",
+            is_paused=0,
             last_checked_at=0,
             created_at=now_ts(),
         )
@@ -153,12 +154,29 @@ def delete_monitor(monitor_id):
     return redirect(url_for("monitors.dashboard"))
 
 
+@monitors_bp.route("/monitors/<monitor_id>/pause", methods=["POST"])
+@login_required
+def toggle_pause(monitor_id):
+    m = get_owned_monitor(monitor_id)
+    if not m:
+        flash("Monitor not found.", "error")
+        return redirect(url_for("monitors.dashboard"))
+
+    new_val = 0 if m.get("is_paused") else 1
+    db.update("monitors", filters={"id": monitor_id}, updates={"is_paused": new_val})
+    flash(f'Monitor "{m["label"]}" {"paused" if new_val else "resumed"}.', "success")
+
+    next_url = request.form.get("next") or url_for("monitors.dashboard")
+    return redirect(next_url)
+
+
 HISTORY_BAR_COUNT = 90
 
 
 def _build_history_bars(checks, incidents, monitor_created_at, start, now):
     """Split [start, now] into fixed-size slices and classify each one as
-    nodata / up / partial / down, for the status-bar strip on the detail page."""
+    nodata / up / partial / down / unmonitored, for the status-bar strip on
+    the detail page."""
     window = now - start
     if window <= 0:
         return []
@@ -179,7 +197,10 @@ def _build_history_bars(checks, incidents, monitor_created_at, start, now):
 
         lo = bisect.bisect_left(timestamps, b_start)
         hi = bisect.bisect_left(timestamps, b_end)
-        has_checks = hi > lo
+        bucket_checks = checks[lo:hi]
+        has_checks = len(bucket_checks) > 0
+        has_unmonitored = any(c["status"] == "unmonitored" for c in bucket_checks)
+        has_up_or_down = any(c["status"] in ("up", "down") for c in bucket_checks)
 
         down_overlap = 0.0
         for inc in incidents:
@@ -193,6 +214,10 @@ def _build_history_bars(checks, incidents, monitor_created_at, start, now):
             state = "nodata"
         elif not has_checks and down_overlap <= 0:
             state = "nodata"
+        elif down_overlap <= 0 and has_unmonitored and not has_up_or_down:
+            # every check in this slice failed because *our own* network was
+            # down — this is a monitoring gap, not evidence the target was down
+            state = "unmonitored"
         elif down_overlap <= 0:
             state = "up"
         elif down_overlap >= bucket_duration * 0.9:
@@ -247,12 +272,18 @@ def monitor_data(monitor_id):
     incidents = [dict(i) for i in incident_rows]
 
     # Only count uptime % against the portion of the selected window the
-    # monitor actually existed for — otherwise a brand-new monitor with zero
-    # downtime so far would show ~100% on a "24h" or "1y" view it has no
-    # data for yet.
+    # monitor actually existed for *and* was actually reachable to check —
+    # otherwise a brand-new monitor, or one that hit an unmonitored gap,
+    # would show a misleadingly high/low uptime % for time it has no real
+    # data for.
     monitor_created_at = m.get("created_at") or now
     effective_start = max(start, monitor_created_at)
     monitored_seconds = max(0, now - effective_start)
+
+    interval_seconds = m.get("interval_seconds") or 60
+    unmonitored_checks = sum(1 for c in checks if c["status"] == "unmonitored")
+    unmonitored_seconds = min(monitored_seconds, unmonitored_checks * interval_seconds)
+    countable_seconds = max(0, monitored_seconds - unmonitored_seconds)
 
     total_downtime = 0
     longest_downtime = 0
@@ -267,8 +298,8 @@ def monitor_data(monitor_id):
             incidents_started_in_window += 1
 
     uptime_pct = (
-        max(0.0, min(100.0, 100.0 - (total_downtime / monitored_seconds * 100)))
-        if monitored_seconds > 0
+        max(0.0, min(100.0, 100.0 - (total_downtime / countable_seconds * 100)))
+        if countable_seconds > 0
         else None
     )
 
@@ -306,6 +337,7 @@ def monitor_data(monitor_id):
     return jsonify(
         {
             "current_status": m["current_status"],
+            "is_paused": bool(m.get("is_paused")),
             "uptime_pct": round(uptime_pct, 3) if uptime_pct is not None else None,
             "total_downtime_seconds": total_downtime,
             "longest_downtime_seconds": longest_downtime,
@@ -315,6 +347,7 @@ def monitor_data(monitor_id):
             "history": history,
             "window_seconds": window,
             "monitored_seconds": monitored_seconds,
+            "unmonitored_seconds": unmonitored_seconds,
             "server_now": now,
         }
     )

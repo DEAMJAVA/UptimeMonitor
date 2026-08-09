@@ -17,10 +17,14 @@
       <div class="monitor-card">
         <div class="monitor-card-top">
           <h3><a href="{{ url_for('monitors.monitor_detail', monitor_id=m.id) }}">{{ m.label }}</a></h3>
-          {% if m.current_status == 'up' %}
+          {% if m.is_paused %}
+            <span class="badge badge-paused">Paused</span>
+          {% elif m.current_status == 'up' %}
             <span class="badge badge-up">Up</span>
           {% elif m.current_status == 'down' %}
             <span class="badge badge-down">Down</span>
+          {% elif m.current_status == 'unmonitored' %}
+            <span class="badge badge-unmonitored">Unmonitored</span>
           {% else %}
             <span class="badge badge-unknown">Unknown</span>
           {% endif %}
@@ -29,6 +33,10 @@
         <div class="monitor-card-actions">
           <a href="{{ url_for('monitors.monitor_detail', monitor_id=m.id) }}" class="btn btn-outline btn-sm">View</a>
           <a href="{{ url_for('monitors.monitor_settings', monitor_id=m.id) }}" class="btn btn-outline btn-sm">Settings</a>
+          <form method="POST" action="{{ url_for('monitors.toggle_pause', monitor_id=m.id) }}" style="margin:0">
+            <input type="hidden" name="next" value="{{ url_for('monitors.dashboard') }}">
+            <button type="submit" class="btn btn-outline btn-sm">{{ 'Resume' if m.is_paused else 'Pause' }}</button>
+          </form>
         </div>
       </div>
     {% endfor %}

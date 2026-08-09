@@ -47,3 +47,11 @@ class Config:
     # --- Monitor checker ---
     CHECK_TICK_SECONDS = _int("CHECK_TICK_SECONDS", 5)
     REQUEST_TIMEOUT_SECONDS = _int("REQUEST_TIMEOUT_SECONDS", 10)
+
+    # Used to tell "the monitored site is down" apart from "our own network
+    # is the thing that's broken". If a check fails, we try these URLs; if
+    # none of them respond either, we assume it's our own connectivity and
+    # log the period as "unmonitored" instead of "down".
+    _canary_raw = os.environ.get("CANARY_URLS", "https://www.google.com,https://1.1.1.1")
+    CANARY_URLS = [u.strip() for u in _canary_raw.split(",") if u.strip()]
+    CANARY_TIMEOUT_SECONDS = _int("CANARY_TIMEOUT_SECONDS", 5)

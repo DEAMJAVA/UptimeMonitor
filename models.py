@@ -35,6 +35,7 @@ def init_db():
         interval_seconds=Integer,
         notify_emails=Text,
         current_status=String(20),
+        is_paused=Integer,
         last_checked_at=Integer,
         created_at=Integer,
     )

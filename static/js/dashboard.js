@@ -31,27 +31,39 @@
     return d.toLocaleString();
   }
 
-  function statusBadgeHtml(status) {
+  function statusBadgeHtml(status, isPaused) {
+    if (isPaused) return '<span class="badge badge-paused">Paused</span>';
     if (status === "up") return '<span class="badge badge-up">Up</span>';
     if (status === "down") return '<span class="badge badge-down">Down</span>';
+    if (status === "unmonitored") return '<span class="badge badge-unmonitored">Unmonitored</span>';
     return '<span class="badge badge-unknown">Unknown</span>';
   }
 
   function renderStats(data) {
-    document.getElementById("stat-status").innerHTML = statusBadgeHtml(data.current_status);
+    document.getElementById("stat-status").innerHTML = statusBadgeHtml(data.current_status, data.is_paused);
     document.getElementById("stat-uptime").textContent =
       data.uptime_pct === null ? "—" : data.uptime_pct.toFixed(2) + "%";
     document.getElementById("stat-downtime").textContent = formatDuration(data.total_downtime_seconds);
     document.getElementById("stat-longest").textContent = formatDuration(data.longest_downtime_seconds);
     document.getElementById("stat-incidents").textContent = data.total_incidents;
-    document.getElementById("live-status-badge").innerHTML = statusBadgeHtml(data.current_status);
+    document.getElementById("live-status-badge").innerHTML = statusBadgeHtml(data.current_status, data.is_paused);
 
     const coverageEl = document.getElementById("coverage-note");
+    const notes = [];
     if (data.monitored_seconds < data.window_seconds * 0.98) {
-      coverageEl.textContent =
+      notes.push(
         data.monitored_seconds <= 0
           ? "This monitor has no data yet for the selected range."
-          : `Based on ${formatDuration(data.monitored_seconds)} of monitoring data — this monitor hasn't existed for the full selected range.`;
+          : `Based on ${formatDuration(data.monitored_seconds)} of monitoring data — this monitor hasn't existed for the full selected range.`
+      );
+    }
+    if (data.unmonitored_seconds > 0) {
+      notes.push(
+        `${formatDuration(data.unmonitored_seconds)} of this period is excluded from uptime % — our server lost connectivity, so we couldn't tell if the target was actually reachable.`
+      );
+    }
+    if (notes.length) {
+      coverageEl.textContent = notes.join(" ");
       coverageEl.style.display = "block";
     } else {
       coverageEl.style.display = "none";
@@ -132,22 +144,28 @@
       .join("");
 
     container.innerHTML = `
-      <table class="incidents-table">
-        <thead>
-          <tr><th>Started</th><th>Resolved</th><th>Duration</th><th>Status</th></tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>`;
+      <div class="table-scroll">
+        <table class="incidents-table">
+          <thead>
+            <tr><th>Started</th><th>Resolved</th><th>Duration</th><th>Status</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
   }
 
   function renderHistory(bars, range) {
     const container = document.getElementById("history-bars");
     container.innerHTML = bars
       .map((b) => {
-        const pct =
-          b.state === "nodata"
-            ? "no data"
-            : `${Math.round((1 - b.down_fraction) * 100)}% up`;
+        let pct;
+        if (b.state === "nodata") {
+          pct = "no data";
+        } else if (b.state === "unmonitored") {
+          pct = "unmonitored (our network was down)";
+        } else {
+          pct = `${Math.round((1 - b.down_fraction) * 100)}% up`;
+        }
         const title = `${formatDateTime(b.start)} — ${formatDateTime(b.end)}\n${pct}`;
         return `<div class="history-bar state-${b.state}" title="${title}"></div>`;
       })

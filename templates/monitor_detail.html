@@ -11,14 +11,22 @@
   </div>
   <div class="detail-actions">
     <span id="live-status-badge">
-      {% if monitor.current_status == 'up' %}
+      {% if monitor.is_paused %}
+        <span class="badge badge-paused">Paused</span>
+      {% elif monitor.current_status == 'up' %}
         <span class="badge badge-up">Up</span>
       {% elif monitor.current_status == 'down' %}
         <span class="badge badge-down">Down</span>
+      {% elif monitor.current_status == 'unmonitored' %}
+        <span class="badge badge-unmonitored">Unmonitored</span>
       {% else %}
         <span class="badge badge-unknown">Unknown</span>
       {% endif %}
     </span>
+    <form method="POST" action="{{ url_for('monitors.toggle_pause', monitor_id=monitor.id) }}" style="margin:0">
+      <input type="hidden" name="next" value="{{ url_for('monitors.monitor_detail', monitor_id=monitor.id) }}">
+      <button type="submit" class="btn btn-outline btn-sm">{{ 'Resume Monitor' if monitor.is_paused else 'Pause Monitor' }}</button>
+    </form>
     <a href="{{ url_for('monitors.monitor_settings', monitor_id=monitor.id) }}" class="btn btn-outline btn-sm">Settings</a>
   </div>
 </div>
@@ -57,10 +65,19 @@
 <div class="panel">
   <h2>Uptime History</h2>
   <p class="panel-subtitle">Status per time slice for the selected period</p>
-  <div class="history-bars" id="history-bars"></div>
+  <div class="history-bars-outer">
+    <div class="history-bars" id="history-bars"></div>
+  </div>
   <div class="history-labels">
     <span id="history-label-start">&mdash;</span>
     <span id="history-label-end">Now</span>
+  </div>
+  <div class="history-legend">
+    <span><i class="legend-dot dot-up"></i> Up</span>
+    <span><i class="legend-dot dot-partial"></i> Partial</span>
+    <span><i class="legend-dot dot-down"></i> Down</span>
+    <span><i class="legend-dot dot-unmonitored"></i> Unmonitored</span>
+    <span><i class="legend-dot dot-nodata"></i> No data</span>
   </div>
 </div>
 
