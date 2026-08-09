@@ -19,6 +19,7 @@ def migrate():
     if "is_paused" not in monitor_columns:
         print('Adding missing column: monitors.is_paused ...')
         db.add_column("monitors", "is_paused", Integer())
+        db.refresh("monitors")
         db.update("monitors", {"is_paused": None}, {'is_paused': True})
         print("  done — existing monitors defaulted to is_paused = 0 (not paused).")
         changed = True
