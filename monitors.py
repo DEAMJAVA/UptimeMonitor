@@ -9,7 +9,6 @@ from models import new_id, now_ts
 
 monitors_bp = Blueprint("monitors", __name__)
 
-# range key -> window length in seconds
 RANGE_SECONDS = {
     "24h": 24 * 3600,
     "7d": 7 * 24 * 3600,
@@ -174,18 +173,12 @@ HISTORY_BAR_COUNT = 90
 
 
 def _build_history_bars(checks, incidents, monitor_created_at, start, now):
-    """Split [start, now] into fixed-size slices and classify each one as
-    nodata / up / partial / down / unmonitored, for the status-bar strip on
-    the detail page."""
     window = now - start
     if window <= 0:
         return []
 
     bucket_size = max(1, window / HISTORY_BAR_COUNT)
 
-    # checks are sorted ascending by timestamp (from the SQL query), so we can
-    # use binary search to test "is there monitoring data in this slice"
-    # instead of rescanning the whole list per bucket.
     timestamps = [c["timestamp"] for c in checks]
 
     bars = []
@@ -215,8 +208,6 @@ def _build_history_bars(checks, incidents, monitor_created_at, start, now):
         elif not has_checks and down_overlap <= 0:
             state = "nodata"
         elif down_overlap <= 0 and has_unmonitored and not has_up_or_down:
-            # every check in this slice failed because *our own* network was
-            # down — this is a monitoring gap, not evidence the target was down
             state = "unmonitored"
         elif down_overlap <= 0:
             state = "up"
@@ -271,11 +262,6 @@ def monitor_data(monitor_id):
     checks = [dict(c) for c in check_rows]
     incidents = [dict(i) for i in incident_rows]
 
-    # Only count uptime % against the portion of the selected window the
-    # monitor actually existed for *and* was actually reachable to check —
-    # otherwise a brand-new monitor, or one that hit an unmonitored gap,
-    # would show a misleadingly high/low uptime % for time it has no real
-    # data for.
     monitor_created_at = m.get("created_at") or now
     effective_start = max(start, monitor_created_at)
     monitored_seconds = max(0, now - effective_start)
@@ -303,7 +289,6 @@ def monitor_data(monitor_id):
         else None
     )
 
-    # bucket average response time into ~60 points across the window
     bucket_count = 60
     bucket_size = max(1, window // bucket_count)
     buckets = {}

@@ -19,9 +19,6 @@ def parse_emails(raw):
 
 
 def _network_reachable():
-    """Best-effort check for whether *our* server has internet access at all.
-    Used to tell 'the monitored site is down' apart from 'our own network/DNS
-    is the thing that's broken right now' before ever recording a check."""
     for canary_url in Config.CANARY_URLS:
         try:
             requests.head(canary_url, timeout=Config.CANARY_TIMEOUT_SECONDS)
@@ -32,18 +29,6 @@ def _network_reachable():
 
 
 def check_monitor(monitor):
-    """Ping a single monitor's URL, record the result, and react to any
-    up/down transition (incident bookkeeping + notification emails).
-
-    Three possible outcomes per check:
-      - "up"          the URL responded with a 2xx/3xx status
-      - "down"        the request failed AND our own network is reachable
-                       (so the failure is genuinely the target's fault)
-      - "unmonitored" the request failed AND our own network is unreachable
-                       too — we can't tell if the target is actually down,
-                       so this period is recorded as a monitoring gap, not
-                       an outage.
-    """
     url = monitor["url"]
     prev_status = monitor.get("current_status") or "unknown"
 
@@ -81,14 +66,12 @@ def check_monitor(monitor):
 
 
 def _handle_status_change(monitor, prev_status, new_status, ts):
-    # A monitoring gap (our own network was down) is neither an "up" nor a
-    # "down" event for the target — don't touch incidents or send email.
     if new_status == "unmonitored":
         return
 
+    downtime_seconds = None
+
     if new_status == "down":
-        # Avoid opening a second overlapping incident if one is already
-        # ongoing (e.g. down -> unmonitored -> down while still broken).
         already_ongoing = db.search("incidents", monitor_id=monitor["id"], status="ongoing")
         if not already_ongoing:
             db.insert(
@@ -102,23 +85,31 @@ def _handle_status_change(monitor, prev_status, new_status, ts):
             )
     elif new_status == "up":
         ongoing = db.search("incidents", monitor_id=monitor["id"], status="ongoing")
+        downtime_seconds = 0
         for inc in ongoing:
             duration = ts - inc["started_at"]
+            downtime_seconds += duration
             db.update(
                 "incidents",
                 filters={"id": inc["id"]},
                 updates={"ended_at": ts, "duration_seconds": duration, "status": "resolved"},
             )
 
-    # Don't email on the very first real check (prev_status == "unknown") —
-    # that's not a real transition, just the monitor coming online for the
-    # first time.
     if prev_status == "unknown":
         return
 
     emails = parse_emails(monitor.get("notify_emails"))
     if emails:
-        send_status_email(emails, monitor["label"], monitor["url"], new_status, ts)
+        dashboard_url = f"{Config.APP_BASE_URL}/monitors/{monitor['id']}"
+        send_status_email(
+            emails,
+            monitor["label"],
+            monitor["url"],
+            new_status,
+            ts,
+            dashboard_url,
+            downtime_seconds=downtime_seconds,
+        )
 
 
 def _loop():
@@ -133,7 +124,7 @@ def _loop():
                 last = m.get("last_checked_at") or 0
                 if now - last >= interval:
                     check_monitor(m)
-        except Exception as exc:  # noqa: BLE001 - keep the loop alive
+        except Exception as exc:
             print(f"[checker error] {exc}")
         time.sleep(Config.CHECK_TICK_SECONDS)
 

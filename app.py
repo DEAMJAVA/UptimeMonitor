@@ -20,8 +20,6 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(monitors_bp)
 
-    # Avoid starting two checker threads when Flask's debug reloader spawns
-    # a child process.
     if not Config.DEBUG or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         start_background_checker()
 

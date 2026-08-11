@@ -7,8 +7,6 @@ from config import Config
 
 
 def send_email(to_addrs, subject, html_body):
-    """Send an HTML email. If SMTP isn't configured, log to console instead
-    of failing, so the rest of the app keeps working in local/dev setups."""
     if not to_addrs:
         return
 
@@ -28,7 +26,7 @@ def send_email(to_addrs, subject, html_body):
                 server.starttls()
             server.login(Config.MAIL_USERNAME, Config.MAIL_PASSWORD)
             server.sendmail(Config.MAIL_DEFAULT_SENDER, to_addrs, msg.as_string())
-    except Exception as exc:  # noqa: BLE001 - never let email errors break requests
+    except Exception as exc:
         print(f"[email error] {exc}")
 
 
@@ -51,10 +49,35 @@ def send_verification_email(to_email, name, token):
     send_email([to_email], "Verify your Uptime Monitor account", html)
 
 
-def send_status_email(to_emails, monitor_label, monitor_url, new_status, at_ts):
+def format_duration(seconds):
+    if seconds is None:
+        return None
+    seconds = max(0, int(round(seconds)))
+    days, rem = divmod(seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, secs = divmod(rem, 60)
+    if days > 0:
+        return f"{days}d {hours}h"
+    if hours > 0:
+        return f"{hours}h {minutes}m"
+    if minutes > 0:
+        return f"{minutes}m {secs}s"
+    return f"{secs}s"
+
+
+def send_status_email(to_emails, monitor_label, monitor_url, new_status, at_ts, dashboard_url, downtime_seconds=None):
     when = datetime.datetime.utcfromtimestamp(at_ts).strftime("%Y-%m-%d %H:%M:%S UTC")
     color = "#e63946" if new_status == "down" else "#2ecc71"
     subject = f"[{monitor_label}] is {new_status.upper()}"
+
+    downtime_row = ""
+    if new_status == "up" and downtime_seconds is not None:
+        downtime_row = f"""
+        <tr>
+          <td style="padding:4px 12px 4px 0;color:#999">Downtime</td>
+          <td style="font-weight:bold">{format_duration(downtime_seconds)}</td>
+        </tr>"""
+
     html = f"""
     <div style="font-family:Arial,sans-serif;background:#0d0d0f;color:#eaeaea;padding:28px;border-radius:8px">
       <h2 style="color:{color};margin-top:0">{monitor_label} is now {new_status.upper()}</h2>
@@ -63,7 +86,15 @@ def send_status_email(to_emails, monitor_label, monitor_url, new_status, at_ts):
         <tr><td style="padding:4px 12px 4px 0;color:#999">URL</td><td>{monitor_url}</td></tr>
         <tr><td style="padding:4px 12px 4px 0;color:#999">Status</td><td style="color:{color};font-weight:bold">{new_status.upper()}</td></tr>
         <tr><td style="padding:4px 12px 4px 0;color:#999">Time</td><td>{when}</td></tr>
+        {downtime_row}
       </table>
+      <p style="margin:24px 0">
+        <a href="{dashboard_url}" style="background:{color};color:#ffffff;padding:12px 22px;
+           text-decoration:none;border-radius:6px;font-weight:bold;display:inline-block">
+           View Monitor Dashboard
+        </a>
+      </p>
+      <p style="color:#999;font-size:13px">Or copy and paste this link into your browser:<br>{dashboard_url}</p>
     </div>
     """
     send_email(to_emails, subject, html)
